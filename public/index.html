@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>LUAN S.A. - Sistema de Gestión</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        :root { --primary: #FF9800; --secondary: #212121; --bg: #F5F5F5; --white: #FFFFFF; --text: #424242; --shadow: 0 4px 20px rgba(0,0,0,0.08); }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+        
+        html, body { width: 100%; height: 100%; background: var(--bg); color: var(--text); overflow: hidden; position: fixed; }
+
+        #loginPage { position: fixed; inset: 0; background: linear-gradient(135deg, var(--primary), #F57C00); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 15px; }
+        .login-card { background: var(--white); padding: 25px; border-radius: 20px; width: 100%; max-width: 400px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); text-align: center; }
+        .login-card img { width: 100px; margin-bottom: 15px; }
+        .login-card h2 { color: var(--secondary); margin-bottom: 20px; font-weight: 800; font-size: 18px; }
+        .form-field { margin-bottom: 15px; text-align: left; }
+        .form-field label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 13px; color: #666; }
+        .form-field input, .form-field select { width: 100%; padding: 12px; border: 2px solid #EEE; border-radius: 10px; font-size: 16px; transition: 0.3s; outline: none; }
+        .form-field input:focus { border-color: var(--primary); }
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 10px; font-weight: 700; font-size: 14px; cursor: pointer; transition: 0.3s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .btn-primary { background: var(--primary); color: var(--white); }
+        .btn-secondary { background: #EEE; color: var(--secondary); }
+        .btn-success { background: #4CAF50; color: white; }
+        .btn-danger { background: #F44336; color: white; }
+        .btn-info { background: #2196F3; color: white; }
+
+        #dashboard { display: none; position: fixed; inset: 0; flex-direction: column; }
+        #dashboard.active { display: flex; }
+        
+        #sidebar { width: 240px; background: var(--secondary); color: var(--white); display: flex; flex-direction: column; position: fixed; left: -240px; height: 100vh; transition: left 0.3s ease; z-index: 2000; }
+        #sidebar.active { left: 0; }
+        #sidebarOverlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; z-index: 1999; }
+        #sidebarOverlay.active { display: block; }
+        .sidebar-header { padding: 20px 15px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .sidebar-header img { width: 60px; margin-bottom: 8px; border-radius: 10px; }
+        .sidebar-header h2 { color: var(--primary); font-weight: 900; font-size: 16px; }
+        .menu-nav { flex: 1; padding: 15px 0; overflow-y: auto; }
+        .menu-item { padding: 12px 15px; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: 0.2s; color: rgba(255,255,255,0.7); font-weight: 600; text-decoration: none; font-size: 13px; }
+        .menu-item:active, .menu-item.active { background: rgba(255,255,255,0.1); color: var(--primary); border-left: 3px solid var(--primary); padding-left: 12px; }
+        .menu-item i { width: 18px; font-size: 16px; }
+
+        main { flex: 1; display: flex; flex-direction: column; background: var(--bg); position: relative; width: 100%; overflow: hidden; }
+        header { background: var(--white); padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; box-shadow: var(--shadow); z-index: 900; flex-shrink: 0; }
+        .menu-btn { display: block; font-size: 22px; cursor: pointer; color: var(--secondary); background: none; border: none; padding: 5px; }
+        .header-logo { display: flex; align-items: center; gap: 8px; flex: 1; }
+        .header-logo img { width: 32px; height: 32px; border-radius: 6px; object-fit: contain; }
+        .header-logo span { font-weight: 900; font-size: 14px; color: var(--primary); }
+        .user-info { display: flex; align-items: center; gap: 8px; }
+        .user-avatar { width: 36px; height: 36px; background: var(--primary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; }
+        
+        .content-area { flex: 1; padding: 10px; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+        .page-content { display: none; animation: fadeIn 0.3s ease; height: 100%; flex-direction: column; overflow: hidden; }
+        .page-content.active { display: flex; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .card { background: var(--white); padding: 12px; border-radius: 12px; box-shadow: var(--shadow); margin-bottom: 12px; }
+        .page-header { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; flex-shrink: 0; }
+        .page-header h1 { font-size: 16px; font-weight: 800; color: var(--secondary); margin: 0; }
+        .page-header > div { width: 100%; display: flex; flex-direction: column; gap: 8px; }
+        .page-header button { width: 100%; padding: 10px; font-size: 12px; }
+        
+        .table-container-compact { overflow-x: auto; overflow-y: auto; border-radius: 10px; -webkit-overflow-scrolling: touch; height: 180px; flex-shrink: 0; margin-bottom: 10px; background: white; box-shadow: var(--shadow); position: relative; z-index: 5; }
+        table { width: 100%; border-collapse: collapse; min-width: 400px; }
+        th { background: #F8F9FA; padding: 8px 6px; text-align: left; font-size: 10px; text-transform: uppercase; color: #888; font-weight: 700; border-bottom: 2px solid #EEE; position: sticky; top: 0; z-index: 10; }
+        td { padding: 8px 6px; border-bottom: 1px solid #EEE; font-size: 11px; vertical-align: middle; }
+        
+        .map-wrapper-large { flex: 1; width: 100%; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); position: relative; z-index: 1; min-height: 200px; }
+        #map, #map-ventas, #map-entregas { width: 100% !important; height: 100% !important; background: #E0E0E0; }
+        .leaflet-control-container { z-index: 1 !important; }
+        
+        .price-box { background: #FFF3E0; padding: 12px; border-radius: 10px; text-align: center; font-size: 16px; font-weight: 800; color: var(--primary); margin-top: 10px; border: 2px dashed var(--primary); }
+
+        #modalOverlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; align-items: flex-start; justify-content: center; z-index: 3000; padding: 10px; }
+        .modal-card { background: var(--white); width: 100%; border-radius: 20px; overflow: hidden; animation: modalFadeIn 0.3s ease; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 20px 50px rgba(0,0,0,0.3); }
+        @keyframes modalFadeIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+        .modal-header { background: var(--primary); color: white; padding: 15px 12px; flex-shrink: 0; }
+        .modal-header h2 { font-size: 16px; margin: 0; }
+        .modal-body { padding: 15px; overflow-y: auto; -webkit-overflow-scrolling: touch; flex: 1; }
+        .modal-footer { padding: 12px; border-top: 1px solid #EEE; display: flex; gap: 8px; flex-shrink: 0; }
+        .modal-footer button { flex: 1; padding: 10px; font-size: 12px; }
+
+        #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--secondary); color: white; padding: 10px 20px; border-radius: 50px; font-weight: 600; font-size: 12px; z-index: 4000; display: none; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+        #toast.show { display: block; animation: toastIn 0.3s ease; }
+        
+        .gps-status { background: #E3F2FD; color: #1976D2; padding: 12px; border-radius: 8px; text-align: center; font-weight: 700; margin-bottom: 10px; font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 8px; border: 2px solid #1976D2; }
+        .gps-status i { animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.6; transform: scale(1.1); } }
+
+        .search-results { background: white; border: 1px solid #ddd; border-radius: 8px; margin-top: 5px; max-height: 150px; overflow-y: auto; display: none; z-index: 100; }
+        .search-item { padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 12px; }
+
+        .info-card { background: white; border-radius: 15px; padding: 20px; margin-bottom: 15px; box-shadow: var(--shadow); }
+        .info-header { display: flex; align-items: center; gap: 15px; margin-bottom: 20px; }
+        .info-avatar { width: 60px; height: 60px; background: var(--primary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: bold; }
+        .info-title h2 { font-size: 18px; color: var(--secondary); }
+        .info-title p { font-size: 13px; color: #666; }
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .info-item label { display: block; font-size: 11px; color: #888; font-weight: bold; text-transform: uppercase; }
+        .info-item span { font-size: 14px; color: var(--secondary); font-weight: 600; }
+        .history-list { border-top: 1px solid #EEE; padding-top: 15px; }
+        .history-item { padding: 10px; border-bottom: 1px solid #F5F5F5; display: flex; justify-content: space-between; align-items: center; }
+        .history-price { font-weight: bold; color: var(--primary); font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div id="toast">Mensaje</div>
+    <div id="loginPage">
+        <div class="login-card">
+            <img src="https://cdn.phototourl.com/free/2026-03-28-d7ad2e1d-1da0-4f1b-b894-6a5cfc6e2090.png" alt="Logo">
+            <h2>LUAN S.A.</h2>
+            <form id="loginForm">
+                <div class="form-field"><label>Usuario</label><input type="text" id="username" required placeholder="Usuario" autocomplete="off"></div>
+                <div class="form-field"><label>Contraseña</label><input type="password" id="password" required placeholder="••••••••" autocomplete="off"></div>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-sign-in-alt"></i> INGRESAR</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="dashboard">
+        <div id="sidebarOverlay" onclick="toggleSidebar()"></div>
+        <aside id="sidebar">
+            <div class="sidebar-header">
+                <img src="https://cdn.phototourl.com/free/2026-03-28-d7ad2e1d-1da0-4f1b-b894-6a5cfc6e2090.png" alt="Logo">
+                <h2>LUAN S.A.</h2>
+            </div>
+            <nav class="menu-nav">
+                <a class="menu-item active" onclick="showPage('inventario')"><i class="fas fa-boxes"></i> INVENTARIO</a>
+                <a class="menu-item" onclick="showPage('rutero')"><i class="fas fa-map-marked-alt"></i> RUTERO</a>
+                <a class="menu-item" onclick="showPage('ventas')"><i class="fas fa-shopping-cart"></i> VENTAS</a>
+                <a class="menu-item" onclick="showPage('entregas')"><i class="fas fa-truck"></i> ENTREGAS</a>
+                <a class="menu-item" onclick="showPage('clientes')"><i class="fas fa-users"></i> CLIENTES</a>
+                <a id="adminMenu" class="menu-item" onclick="showPage('admin')" style="display:none;"><i class="fas fa-user-shield"></i> ADMIN</a>
+            </nav>
+            <div style="padding:15px;"><button class="btn btn-danger" onclick="logout()"><i class="fas fa-sign-out-alt"></i> CERRAR SESIÓN</button></div>
+        </aside>
+
+        <main>
+            <header>
+                <button class="menu-btn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+                <div class="header-logo">
+                    <img src="https://cdn.phototourl.com/free/2026-03-28-d7ad2e1d-1da0-4f1b-b894-6a5cfc6e2090.png" alt="Logo">
+                    <span>LUAN S.A.</span>
+                </div>
+                <div class="user-info">
+                    <div class="user-avatar" id="userAvatar">A</div>
+                </div>
+            </header>
+
+            <div class="content-area">
+                <!-- Inventario -->
+                <div id="page-inventario" class="page-content active">
+                    <div class="page-header">
+                        <h1>INVENTARIO</h1>
+                        <div>
+                            <button class="btn btn-primary" onclick="openProductModal()"><i class="fas fa-plus"></i> NUEVO PRODUCTO</button>
+                            <button id="adminInventoryBtns" class="btn btn-secondary" style="display:none;" onclick="exportPDF('inventory')"><i class="fas fa-file-pdf"></i> EXPORTAR PDF</button>
+                        </div>
+                    </div>
+                    <div class="card table-container" style="flex:1; overflow-y: auto;">
+                        <table id="inventoryTable">
+                            <thead><tr><th>Código</th><th>Producto</th><th>Stock</th><th>Acción</th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Rutero -->
+                <div id="page-rutero" class="page-content">
+                    <div class="page-header">
+                        <h1>RUTERO (LEVANTAMIENTO)</h1>
+                        <div>
+                            <button class="btn btn-primary" onclick="openMapeoModal()"><i class="fas fa-map-marker-alt"></i> MAPEAR TIENDA</button>
+                            <button id="btnStartRoute" class="btn btn-success" onclick="toggleRouteTracking()"><i class="fas fa-play"></i> INICIAR RUTA</button>
+                        </div>
+                    </div>
+                    <div id="routeStatus" class="gps-status" style="display:none;"></div>
+                    <div class="table-container-compact">
+                        <table id="ruteroTable">
+                            <thead><tr><th>#</th><th>Cliente</th><th>Acción</th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <div class="map-wrapper-large"><div id="map"></div></div>
+                </div>
+
+                <!-- Ventas -->
+                <div id="page-ventas" class="page-content">
+                    <div class="page-header">
+                        <h1>VENTAS Y PREVENTAS</h1>
+                        <div style="display:flex; gap:8px;">
+                            <button class="btn btn-primary" onclick="openNewClientSaleModal()"><i class="fas fa-user-plus"></i> VENTA (CLIENTE NUEVO)</button>
+                            <button id="exportSalesBtn" class="btn btn-secondary" onclick="exportPDF('sales')" style="display:none;"><i class="fas fa-file-pdf"></i> EXPORTAR PDF</button>
+                        </div>
+                    </div>
+                    <div class="table-container-compact">
+                        <table id="salesTable">
+                            <thead><tr><th>Cliente</th><th>Producto</th><th>Total</th><th>Estado</th><th>Acción</th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <div class="map-wrapper-large"><div id="map-ventas"></div></div>
+                </div>
+
+                <!-- Entregas -->
+                <div id="page-entregas" class="page-content">
+                    <div class="page-header"><h1>MAPA DE ENTREGAS</h1></div>
+                    <div class="map-wrapper-large"><div id="map-entregas"></div></div>
+                </div>
+
+                <!-- Clientes -->
+                <div id="page-clientes" class="page-content">
+                    <div class="page-header">
+                        <h1>MIS CLIENTES</h1>
+                        <button class="btn btn-primary" onclick="openClientModal()"><i class="fas fa-user-plus"></i> NUEVO CLIENTE</button>
+                    </div>
+                    <div class="card table-container" style="flex:1; overflow-y: auto;">
+                        <table id="clientsTable">
+                            <thead><tr><th>Nombre</th><th>Dirección</th><th>Teléfono</th><th>Acción</th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Info Cliente -->
+                <div id="page-info" class="page-content">
+                    <div class="page-header">
+                        <h1>INFORMACIÓN DEL CLIENTE</h1>
+                        <button class="btn btn-secondary" onclick="showPage('clientes')"><i class="fas fa-arrow-left"></i> VOLVER</button>
+                    </div>
+                    <div id="clientInfoContent" style="overflow-y:auto; flex:1;"></div>
+                </div>
+
+                <!-- Admin -->
+                <div id="page-admin" class="page-content">
+                    <div class="page-header"><h1>ADMINISTRACIÓN</h1></div>
+                    <div class="card">
+                        <h3 style="margin-bottom:15px; font-size:14px;">GESTIÓN DE VENDEDORES</h3>
+                        <button class="btn btn-primary" onclick="openVendedorModal()" style="margin-bottom:15px;"><i class="fas fa-user-tie"></i> AGREGAR VENDEDOR</button>
+                        <div class="table-container" style="max-height: 400px; overflow-y: auto;">
+                            <table id="vendedoresTable">
+                                <thead><tr><th>Nombre</th><th>Usuario</th><th>Acción</th></tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="modalOverlay">
+        <div class="modal-card">
+            <div class="modal-header"><h2 id="modalTitle">Título</h2></div>
+            <div class="modal-body" id="modalBody"></div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal()">CANCELAR</button>
+                <button class="btn btn-primary" id="modalConfirm">GUARDAR</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDoVRIOCia2CxwAOM8Q3IFRl-ikBE-vkzs",
+            authDomain: "inventario-veo.firebaseapp.com",
+            databaseURL: "https://inventario-veo-default-rtdb.firebaseio.com",
+            projectId: "inventario-veo",
+            storageBucket: "inventario-veo.firebasestorage.app",
+            messagingSenderId: "63546237010",
+            appId: "1:63546237010:web:73e9bf4e4608080ec3bf8b",
+            measurementId: "G-S6GKKHQTKC"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        let currentUser = null;
+        let map = null, mapVentas = null, mapEntregas = null, userMarker = null, routePath = null;
+        let markersRutero = [], markersVentas = [], markersEntregas = [];
+        let isTracking = false, watchId = null;
+        let tempMapeoMarker = null;
+        let currentMapeoCoords = { lat: null, lng: null };
+
+        window.products = [];
+        window.clients = [];
+        window.sales = [];
+        window.vendedores = [];
+
+        function applySession(user) {
+            currentUser = user;
+            document.getElementById('loginPage').style.display = 'none';
+            document.getElementById('dashboard').classList.add('active');
+            const avatar = document.getElementById('userAvatar');
+            if(avatar) avatar.innerText = currentUser.name[0];
+            
+            const adminMenu = document.getElementById('adminMenu');
+            const adminBtn = document.getElementById('adminInventoryBtns');
+            const exportBtn = document.getElementById('exportSalesBtn');
+            
+            if(currentUser.role === 'admin') {
+                if(adminMenu) adminMenu.style.display = 'flex';
+                if(adminBtn) adminBtn.style.display = 'flex';
+                if(exportBtn) exportBtn.style.display = 'flex';
+            } else {
+                if(adminMenu) adminMenu.style.display = 'none';
+                if(adminBtn) adminBtn.style.display = 'none';
+                if(exportBtn) exportBtn.style.display = 'none';
+            }
+            showPage('inventario');
+        }
+
+        window.addEventListener('load', () => {
+            const savedUser = localStorage.getItem('luan_session');
+            if(savedUser) {
+                applySession(JSON.parse(savedUser));
+            }
+        });
+
+        document.addEventListener('focusin', (e) => {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') {
+                window.scrollTo(0, 0);
+                document.body.scrollTop = 0;
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            if(map) map.invalidateSize();
+            if(mapVentas) mapVentas.invalidateSize();
+            if(mapEntregas) mapEntregas.invalidateSize();
+            window.scrollTo(0, 0);
+        });
+
+        async function getPreciseLocation(timeout = 10000) {
+            const options = { enableHighAccuracy: true, timeout: timeout, maximumAge: 0 };
+            return new Promise((resolve, reject) => {
+                if (!navigator.geolocation) { reject(new Error("Geolocation not supported")); return; }
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => resolve(pos),
+                    (err) => {
+                        navigator.geolocation.getCurrentPosition(
+                            (pos) => resolve(pos),
+                            (err2) => reject(err2),
+                            { ...options, enableHighAccuracy: false, timeout: 15000 }
+                        );
+                    },
+                    options
+                );
+            });
+        }
+
+        window.showToast = (msg) => {
+            const t = document.getElementById('toast');
+            if(t) { t.innerText = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000); }
+        };
+
+        window.toggleSidebar = () => {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            if(sidebar) sidebar.classList.toggle('active');
+            if(overlay) overlay.classList.toggle('active');
+        };
+
+        window.showPage = (pageId) => {
+            document.querySelectorAll('.page-content').forEach(p => p.classList.remove('active'));
+            const page = document.getElementById('page-' + pageId);
+            if(page) page.classList.add('active');
+            document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
+            if(event && event.currentTarget) event.currentTarget.classList.add('active');
+            if(window.innerWidth < 768) toggleSidebar();
+            if(pageId === 'rutero' || pageId === 'ventas' || pageId === 'entregas') setTimeout(initMaps, 300);
+            window.scrollTo(0,0);
+        };
+
+        window.showModal = (title, body, onConfirm) => {
+            const titleEl = document.getElementById('modalTitle');
+            const bodyEl = document.getElementById('modalBody');
+            const overlay = document.getElementById('modalOverlay');
+            const confirmBtn = document.getElementById('modalConfirm');
+            if(titleEl) titleEl.innerText = title;
+            if(bodyEl) bodyEl.innerHTML = body;
+            if(overlay) overlay.style.display = 'flex';
+            if(confirmBtn) confirmBtn.onclick = onConfirm;
+            window.scrollTo(0, 0);
+        };
+
+        window.closeModal = () => {
+            const overlay = document.getElementById('modalOverlay');
+            if(overlay) overlay.style.display = 'none';
+            if(tempMapeoMarker && map) { map.removeLayer(tempMapeoMarker); tempMapeoMarker = null; }
+            window.scrollTo(0, 0);
+        };
+
+        const safeNum = (v) => isNaN(parseFloat(v)) ? 0 : parseFloat(v);
+
+        document.getElementById('loginForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const u = document.getElementById('username').value.trim();
+            const p = document.getElementById('password').value.trim();
+            
+            let user = null;
+            if(u === 'admin23' && p === '13456aD') {
+                user = { name: 'Administrador', role: 'admin' };
+            } else {
+                const vend = window.vendedores.find(v => v.user === u && v.pass === p);
+                if(vend) user = { ...vend, role: 'vendedor' };
+            }
+            
+            if(user) {
+                localStorage.setItem('luan_session', JSON.stringify(user));
+                applySession(user);
+            } else { alert("Credenciales incorrectas"); }
+        };
+
+        window.logout = () => {
+            if(confirm("¿Cerrar sesión?")) {
+                localStorage.removeItem('luan_session');
+                location.reload();
+            }
+        };
+
+        onSnapshot(collection(db, "products"), (snap) => {
+            window.products = snap.docs.map(d => ({id: d.id, ...d.data()}));
+            const tbody = document.querySelector('#inventoryTable tbody');
+            if(tbody) tbody.innerHTML = window.products.map(p => `<tr><td>${p.code || ''}</td><td>${p.name || ''}</td><td>${p.stock || 0}</td><td><button class="btn btn-danger" onclick="deleteProduct('${p.id}')" style="padding:5px; font-size:10px;"><i class="fas fa-trash"></i></button></td></tr>`).join('');
+        });
+
+        onSnapshot(collection(db, "vendedores"), (snap) => {
+            window.vendedores = snap.docs.map(d => ({id: d.id, ...d.data()}));
+            const tbody = document.querySelector('#vendedoresTable tbody');
+            if(tbody) tbody.innerHTML = window.vendedores.map(v => `<tr><td>${v.name || ''}</td><td>${v.user || ''}</td><td><button class="btn btn-danger" onclick="deleteVendedor('${v.id}')" style="padding:5px 10px; font-size:10px;">ELIMINAR</button></td></tr>`).join('');
+        });
+
+        onSnapshot(collection(db, "clients"), (snap) => {
+            window.clients = snap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => (b.date || 0) - (a.date || 0));
+            const tbody = document.querySelector('#clientsTable tbody');
+            if(tbody) tbody.innerHTML = window.clients.map(c => `<tr><td>${c.name || ''}</td><td>${c.address || '-'}</td><td>${c.phone || '-'}</td><td><div style="display:flex; gap:5px;"><button class="btn btn-info" onclick="showClientInfo('${c.id}')" style="padding:5px; font-size:10px;"><i class="fas fa-info-circle"></i> INFO</button><button class="btn btn-danger" onclick="deleteClient('${c.id}')" style="padding:5px; font-size:10px;"><i class="fas fa-trash"></i></button></div></td></tr>`).join('');
+            const rbody = document.querySelector('#ruteroTable tbody');
+            if(rbody) rbody.innerHTML = window.clients.map((c, i) => `<tr><td>${i+1}</td><td><b>${c.name || ''}</b><br><small>${c.address || ''}</small></td><td><button class="btn btn-primary" onclick="openSaleModalFromMap('${c.id}')" style="padding:5px; font-size:10px;">VENTA</button></td></tr>`).join('');
+            renderAllMarkers();
+        });
+
+        onSnapshot(query(collection(db, "sales"), orderBy("date", "desc")), (snap) => {
+            window.sales = snap.docs.map(d => ({id: d.id, ...d.data()}));
+            const tbody = document.querySelector('#salesTable tbody');
+            if(tbody) tbody.innerHTML = window.sales.map(s => `<tr><td>${s.clientName || ''}</td><td>${s.productName || ''}</td><td>${(s.total || 0).toFixed(2)}</td><td><span class="badge badge-${s.status === 'Entregado' ? 'delivered' : 'pending'}">${s.status || 'Pendiente'}</span></td><td><button class="btn btn-danger" onclick="deleteSale('${s.id}')" style="padding:5px; font-size:10px;"><i class="fas fa-trash"></i></button></td></tr>`).join('');
+            renderAllMarkers();
+        });
+
+        window.deleteVendedor = async (id) => { if(confirm("¿Eliminar vendedor?")) { try { await deleteDoc(doc(db, "vendedores", id)); showToast("Vendedor eliminado"); } catch(e) { alert("Error: " + e.message); } } };
+        window.deleteClient = async (id) => { if(confirm("¿Eliminar cliente?")) { try { await deleteDoc(doc(db, "clients", id)); showToast("Cliente eliminado"); } catch(e) { alert("Error: " + e.message); } } };
+        window.deleteSale = async (id) => { if(confirm("¿Eliminar venta?")) { try { await deleteDoc(doc(db, "sales", id)); showToast("Venta eliminada"); } catch(e) { alert("Error: " + e.message); } } };
+        window.deleteProduct = async (id) => { if(confirm("¿Eliminar producto?")) { try { await deleteDoc(doc(db, "products", id)); showToast("Producto eliminado"); } catch(e) { alert("Error: " + e.message); } } };
+
+        function initMaps() {
+            const defaultView = [-17.7833, -63.1821];
+            if(map) { map.invalidateSize(); }
+            else {
+                const mapEl = document.getElementById('map');
+                if(mapEl) {
+                    map = L.map('map', { preferCanvas: true }).setView(defaultView, 13);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+                    userMarker = L.marker([0,0], { icon: L.divIcon({ html: '<div style="font-size:30px;">🛵</div>', className: '', iconSize: [40, 40], iconAnchor: [20, 20] }) }).addTo(map);
+                    routePath = L.polyline([], {color: '#FF9800', weight: 5, opacity: 0.6}).addTo(map);
+                }
+            }
+            if(mapVentas) { mapVentas.invalidateSize(); }
+            else {
+                const mapVentasEl = document.getElementById('map-ventas');
+                if(mapVentasEl) {
+                    mapVentas = L.map('map-ventas', { preferCanvas: true }).setView(defaultView, 13);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(mapVentas);
+                }
+            }
+            if(mapEntregas) { mapEntregas.invalidateSize(); }
+            else {
+                const mapEntregasEl = document.getElementById('map-entregas');
+                if(mapEntregasEl) {
+                    mapEntregas = L.map('map-entregas', { preferCanvas: true }).setView(defaultView, 13);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(mapEntregas);
+                }
+            }
+            renderAllMarkers();
+        }
+
+        function renderAllMarkers() {
+            const allClients = window.clients || [];
+            const allSales = window.sales || [];
+
+            if(map) {
+                markersRutero.forEach(m => map.removeLayer(m)); markersRutero = [];
+                allClients.filter(c => c.lat && c.lng).forEach((client, i) => {
+                    const hasSale = allSales.some(s => s.clientId === client.id);
+                    const color = hasSale ? '#4CAF50' : '#FF9800';
+                    const icon = L.divIcon({ html: `<div style="background:${color};color:white;border-radius:50%;width:35px;height:35px;text-align:center;line-height:35px;border:2px solid white;font-weight:bold;box-shadow:0 2px 5px rgba(0,0,0,0.2); font-size:14px;">${i+1}</div>`, className: '', iconSize: [35, 35], iconAnchor: [17, 17] });
+                    const m = L.marker([client.lat, client.lng], {icon}).addTo(map).bindPopup(`<b>${client.name}</b><br><button onclick="showClientInfo('${client.id}')" style="width:100%; margin-top:5px; padding:5px; background:#2196F3; color:white; border:none; border-radius:3px; font-size:10px;">VER INFO</button>`);
+                    markersRutero.push(m);
+                });
+            }
+
+            if(mapVentas) {
+                markersVentas.forEach(m => mapVentas.removeLayer(m)); markersVentas = [];
+                allClients.filter(c => c.lat && c.lng).forEach((client, i) => {
+                    const hasSale = allSales.some(s => s.clientId === client.id);
+                    const color = hasSale ? '#4CAF50' : '#2196F3';
+                    const icon = L.divIcon({ html: `<div style="background:${color};color:white;border-radius:50%;width:35px;height:35px;text-align:center;line-height:35px;border:2px solid white;font-weight:bold;box-shadow:0 2px 5px rgba(0,0,0,0.2); font-size:14px;">${i+1}</div>`, className: '', iconSize: [35, 35], iconAnchor: [17, 17] });
+                    const popupContent = `<div style="min-width:180px;"><b>${client.name}</b><br><small>${client.address || ''}</small><hr style="margin:5px 0;"><button onclick="openSaleModalFromMap('${client.id}')" style="width:100%; padding:8px; background:#2196F3; color:white; border:none; border-radius:5px; font-weight:bold; cursor:pointer;"><i class="fas fa-shopping-cart"></i> HACER VENTA/PREVENTA</button><button onclick="showClientInfo('${client.id}')" style="width:100%; margin-top:5px; padding:5px; background:#EEE; color:#333; border:none; border-radius:5px; font-size:10px;">VER INFO</button></div>`;
+                    const m = L.marker([client.lat, client.lng], {icon}).addTo(mapVentas).bindPopup(popupContent);
+                    markersVentas.push(m);
+                });
+            }
+
+            if(mapEntregas) {
+                markersEntregas.forEach(m => mapEntregas.removeLayer(m)); markersEntregas = [];
+                const clientsWithPending = allClients.filter(c => c.lat && c.lng && allSales.some(s => s.clientId === c.id && s.status !== 'Entregado'));
+                clientsWithPending.forEach((client, i) => {
+                    const clientSales = allSales.filter(s => s.clientId === client.id && s.status !== 'Entregado');
+                    const icon = L.divIcon({ html: `<div style="background:#4CAF50;color:white;border-radius:50%;width:35px;height:35px;text-align:center;line-height:35px;border:2px solid white;font-weight:bold;box-shadow:0 2px 5px rgba(0,0,0,0.2); font-size:14px;">${i+1}</div>`, className: '', iconSize: [35, 35], iconAnchor: [17, 17] });
+                    let salesInfo = clientSales.map(s => `<p style="margin:3px 0; font-size:11px;">• ${s.productName} (${s.qty})</p>`).join('');
+                    const popupContent = `<div style="min-width:180px;"><b>${client.name}</b><br><small>${client.address || ''}</small><hr style="margin:5px 0;"><b>PEDIDOS:</b>${salesInfo}<button onclick="window.open('https://www.google.com/maps/dir/?api=1&destination=${client.lat},${client.lng}')" style="width:100%; margin-top:8px; padding:8px; background:#4CAF50; color:white; border:none; border-radius:5px; font-weight:bold; cursor:pointer;"><i class="fas fa-truck"></i> IR A ENTREGAR</button></div>`;
+                    const m = L.marker([client.lat, client.lng], {icon}).addTo(mapEntregas).bindPopup(popupContent);
+                    markersEntregas.push(m);
+                });
+            }
+        }
+
+        window.showClientInfo = (clientId) => {
+            const client = window.clients.find(c => c.id === clientId);
+            if(!client) return;
+            const clientSales = (window.sales || []).filter(s => s.clientId === clientId);
+            
+            let historyHtml = clientSales.length > 0 ? clientSales.map(s => `
+                <div class="history-item">
+                    <div class="history-info">
+                        <b>${s.productName} (${s.qty} ${s.priceType})</b>
+                        <small>${new Date(s.date).toLocaleDateString()} - ${s.status}</small>
+                    </div>
+                    <div class="history-price">${(s.total || 0).toFixed(2)} Bs</div>
+                </div>
+            `).join('') : '<p style="text-align:center; padding:20px; color:#888;">No hay historial de compras.</p>';
+
+            const content = `
+                <div class="info-card">
+                    <div class="info-header">
+                        <div class="info-avatar">${(client.name || 'C')[0]}</div>
+                        <div class="info-title">
+                            <h2>${client.name || 'Sin nombre'}</h2>
+                            <p>${client.propietario || 'Sin propietario'}</p>
+                        </div>
+                    </div>
+                    <div class="info-grid">
+                        <div class="info-item"><label>CI / NIT</label><span>${client.ci || '-'}</span></div>
+                        <div class="info-item"><label>Teléfono</label><span>${client.phone || '-'}</span></div>
+                        <div class="info-item" style="grid-column: span 2;"><label>Dirección</label><span>${client.address || '-'}</span></div>
+                        <div class="info-item" style="grid-column: span 2;"><label>Mapeado por</label><span>${client.mapeadoPor || 'Desconocido'}</span></div>
+                    </div>
+                    <div class="history-list">
+                        <h3 style="font-size:14px; margin-bottom:10px;">HISTORIAL DE COMPRAS</h3>
+                        ${historyHtml}
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="window.open('https://www.google.com/maps/dir/?api=1&destination=${client.lat},${client.lng}')"><i class="fas fa-directions"></i> CÓMO LLEGAR</button>
+            `;
+            
+            const infoContent = document.getElementById('clientInfoContent');
+            if(infoContent) infoContent.innerHTML = content;
+            showPage('info');
+        };
+
+        window.openProductModal = () => {
+            const body = `
+                <div class="form-field"><label>Código</label><input id="p_code"></div>
+                <div class="form-field"><label>Nombre del Producto</label><input id="p_name"></div>
+                <div class="form-field"><label>Stock Inicial</label><input type="number" id="p_stock"></div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                    <div class="form-field"><label>Precio Unidad</label><input type="number" id="p_unit" step="0.01"></div>
+                    <div class="form-field"><label>Precio Media Docena</label><input type="number" id="p_half_docen" step="0.01"></div>
+                    <div class="form-field"><label>Precio Docena</label><input type="number" id="p_docen" step="0.01"></div>
+                    <div class="form-field"><label>Precio Caja</label><input type="number" id="p_box" step="0.01"></div>
+                    <div class="form-field"><label>Precio Media Jaba</label><input type="number" id="p_half_java" step="0.01"></div>
+                    <div class="form-field"><label>Precio Jaba</label><input type="number" id="p_java" step="0.01"></div>
+                </div>
+            `;
+            showModal("Nuevo Producto", body, async () => {
+                const name = document.getElementById('p_name').value.trim();
+                const code = document.getElementById('p_code').value.trim();
+                if(!name || !code) { alert("Nombre y código requeridos"); return; }
+                try {
+                    await addDoc(collection(db, "products"), { 
+                        name, code, 
+                        stock: parseInt(document.getElementById('p_stock').value) || 0,
+                        priceUnit: safeNum(document.getElementById('p_unit').value),
+                        priceHalfDocen: safeNum(document.getElementById('p_half_docen').value),
+                        priceDocen: safeNum(document.getElementById('p_docen').value),
+                        priceBox: safeNum(document.getElementById('p_box').value),
+                        priceHalfJava: safeNum(document.getElementById('p_half_java').value),
+                        priceJava: safeNum(document.getElementById('p_java').value),
+                        date: Date.now() 
+                    });
+                    closeModal(); showToast("Producto agregado");
+                } catch(e) { alert("Error: " + e.message); }
+            });
+        };
+
+        window.searchAddress = async () => {
+            const input = document.getElementById('m_d');
+            if(!input) return;
+            const query = input.value.trim();
+            if(query.length < 3) return;
+            const resultsDiv = document.getElementById('search-results');
+            try {
+                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`);
+                const data = await response.json();
+                if(data.length > 0 && resultsDiv) {
+                    resultsDiv.innerHTML = data.map(item => `<div class="search-item" onclick="selectAddress(${item.lat}, ${item.lon}, '${item.display_name.replace(/'/g, "\\'")}')">${item.display_name}</div>`).join('');
+                    resultsDiv.style.display = 'block';
+                } else if(resultsDiv) {
+                    resultsDiv.style.display = 'none';
+                }
+            } catch (e) { console.error("Search error:", e); }
+        };
+
+        window.selectAddress = (lat, lng, address) => {
+            const input = document.getElementById('m_d');
+            const resultsDiv = document.getElementById('search-results');
+            if(input) input.value = address;
+            if(resultsDiv) resultsDiv.style.display = 'none';
+            currentMapeoCoords = { lat, lng };
+            if(map) {
+                map.setView([lat, lng], 16);
+                if(tempMapeoMarker) map.removeLayer(tempMapeoMarker);
+                tempMapeoMarker = L.marker([lat, lng], { draggable: true }).addTo(map);
+                tempMapeoMarker.on('dragend', function(event) {
+                    const position = tempMapeoMarker.getLatLng();
+                    currentMapeoCoords = { lat: position.lat, lng: position.lng };
+                });
+                showToast("Ubicación marcada en el mapa");
+            }
+        };
+
+        window.openMapeoModal = () => {
+            currentMapeoCoords = { lat: null, lng: null };
+            const body = `<div class="form-field"><label>Nombre de la Tienda</label><input id="m_n" placeholder="Ej: Tienda Luis"></div><div class="form-field"><label>Nombre del Propietario</label><input id="m_p"></div><div class="form-field"><label>CI / NIT</label><input id="m_ci"></div><div class="form-field"><label>Teléfono / WhatsApp</label><input id="m_t"></div><div class="form-field"><label>Dirección (Escribe para buscar)</label><input id="m_d" placeholder="Ej: Calle Bolivar 123" oninput="searchAddress()"></div><div id="search-results" class="search-results"></div>`;
+            showModal("Mapear Nueva Tienda", body, async () => {
+                const name = document.getElementById('m_n').value.trim();
+                const address = document.getElementById('m_d').value.trim();
+                if (!name) { alert("Nombre de tienda requerido"); return; }
+                
+                let lat = currentMapeoCoords.lat;
+                let lng = currentMapeoCoords.lng;
+
+                if(!lat || !lng) {
+                    showToast("Obteniendo ubicación GPS actual...");
+                    try {
+                        const pos = await getPreciseLocation(10000);
+                        lat = pos.coords.latitude; lng = pos.coords.longitude;
+                    } catch(e) { 
+                        alert("⚠️ No se pudo obtener la ubicación. Por favor busca la dirección o activa tu GPS."); 
+                        return; 
+                    }
+                }
+
+                const clientData = { 
+                    name: String(name), 
+                    propietario: String(document.getElementById('m_p').value.trim()), 
+                    ci: String(document.getElementById('m_ci').value.trim()), 
+                    phone: String(document.getElementById('m_t').value.trim()), 
+                    address: String(address), 
+                    lat: Number(lat), 
+                    lng: Number(lng), 
+                    date: Date.now(), 
+                    mapeadoPor: currentUser ? String(currentUser.name) : 'Desconocido' 
+                };
+
+                try {
+                    await addDoc(collection(db, "clients"), clientData);
+                    closeModal(); 
+                    showToast("Tienda mapeada con éxito");
+                } catch (e) {
+                    alert("ERROR DE FIREBASE: " + e.code);
+                }
+            });
+        };
+
+        window.openSaleModalFromMap = (clientId) => {
+            const client = window.clients.find(c => c.id === clientId);
+            if (!client) return;
+            const pOpt = (window.products || []).map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+            const body = `
+                <div class="form-field"><label>Cliente</label><input type="text" value="${client.name}" disabled style="background:#f0f0f0;"></div>
+                <div class="form-field"><label>Tipo de Operación</label><select id="s_type"><option value="Preventa">Preventa (Pendiente)</option><option value="Entregado">Venta Directa (Entregado)</option></select></div>
+                <div class="form-field"><label>Producto</label><select id="s_product" onchange="calculateSaleTotal()">${pOpt}</select></div>
+                <div class="form-field"><label>Tipo de Unidad</label><select id="s_price_type" onchange="calculateSaleTotal()">
+                    <option value="unit">Unidad</option>
+                    <option value="half_docen">Media Docena</option>
+                    <option value="docen">Docena</option>
+                    <option value="box">Caja</option>
+                    <option value="half_java">Media Jaba</option>
+                    <option value="java">Jaba</option>
+                </select></div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                    <div class="form-field"><label>Precio (Bs)</label><input type="number" id="s_price_manual" step="0.01" oninput="calculateSaleTotal()"></div>
+                    <div class="form-field"><label>Cantidad</label><input type="number" id="s_qty" value="1" oninput="calculateSaleTotal()"></div>
+                </div>
+                <div id="price_preview" class="price-box">0.00 Bs</div>
+            `;
+            showModal("Venta/Preventa - " + client.name, body, async () => {
+                const pId = document.getElementById('s_product').value;
+                const pt = document.getElementById('s_price_type').value;
+                const pr = safeNum(document.getElementById('s_price_manual').value);
+                const qty = parseInt(document.getElementById('s_qty').value) || 0;
+                const type = document.getElementById('s_type').value;
+                const p = window.products.find(p => p.id === pId);
+                if (!p || qty <= 0 || pr <= 0) { alert("Datos inválidos"); return; }
+                
+                const saleData = { 
+                    clientId: String(clientId), 
+                    clientName: String(client.name), 
+                    productId: String(pId), 
+                    productName: String(p.name), 
+                    priceType: String(pt), 
+                    price: Number(pr), 
+                    qty: Number(qty), 
+                    total: Number(pr * qty), 
+                    status: type, 
+                    date: Date.now(), 
+                    lat: client.lat !== undefined ? Number(client.lat) : null, 
+                    lng: client.lng !== undefined ? Number(client.lng) : null, 
+                    seller: currentUser ? String(currentUser.name) : 'Desconocido'
+                };
+                
+                try { 
+                    await addDoc(collection(db, "sales"), saleData); 
+                    await updateDoc(doc(db, "products", pId), { stock: Number((p.stock || 0) - qty) }); 
+                    closeModal(); 
+                    showToast(type + " guardada"); 
+                } catch (e) { 
+                    alert("Error al guardar: " + e.code); 
+                }
+            });
+            setTimeout(window.calculateSaleTotal, 100);
+        };
+
+        window.openNewClientSaleModal = () => {
+            const pOpt = (window.products || []).map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+            const body = `
+                <h3 style="font-size:14px; margin-bottom:10px; color:var(--primary);">DATOS DEL CLIENTE</h3>
+                <div class="form-field"><label>Nombre de la Tienda</label><input id="nc_n"></div>
+                <div class="form-field"><label>Dirección</label><input id="nc_d"></div>
+                <div class="form-field"><label>Teléfono</label><input id="nc_t"></div>
+                <hr style="margin:15px 0;">
+                <h3 style="font-size:14px; margin-bottom:10px; color:var(--primary);">DATOS DE LA VENTA</h3>
+                <div class="form-field"><label>Tipo de Operación</label><select id="nc_type"><option value="Preventa">Preventa (Pendiente)</option><option value="Entregado">Venta Directa (Entregado)</option></select></div>
+                <div class="form-field"><label>Producto</label><select id="nc_product" onchange="calculateNewClientSaleTotal()">${pOpt}</select></div>
+                <div class="form-field"><label>Tipo de Unidad</label><select id="nc_price_type" onchange="calculateNewClientSaleTotal()">
+                    <option value="unit">Unidad</option>
+                    <option value="half_docen">Media Docena</option>
+                    <option value="docen">Docena</option>
+                    <option value="box">Caja</option>
+                    <option value="half_java">Media Jaba</option>
+                    <option value="java">Jaba</option>
+                </select></div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                    <div class="form-field"><label>Precio (Bs)</label><input type="number" id="nc_price_manual" step="0.01" oninput="calculateNewClientSaleTotal()"></div>
+                    <div class="form-field"><label>Cantidad</label><input type="number" id="nc_qty" value="1" oninput="calculateNewClientSaleTotal()"></div>
+                </div>
+                <div id="nc_price_preview" class="price-box">0.00 Bs</div>
+            `;
+            showModal("Nueva Venta (Cliente Nuevo)", body, async () => {
+                const cName = document.getElementById('nc_n').value.trim();
+                const pId = document.getElementById('nc_product').value;
+                const qty = parseInt(document.getElementById('nc_qty').value) || 0;
+                const pr = safeNum(document.getElementById('nc_price_manual').value);
+                const type = document.getElementById('nc_type').value;
+                const p = window.products.find(p => p.id === pId);
+
+                if(!cName || !p || qty <= 0 || pr <= 0) { alert("Por favor completa todos los campos"); return; }
+
+                showToast("Obteniendo ubicación GPS...");
+                let lat = null, lng = null;
+                try {
+                    const pos = await getPreciseLocation(10000);
+                    lat = pos.coords.latitude; lng = pos.coords.longitude;
+                } catch(e) { console.warn("GPS error, saving without coords"); }
+
+                try {
+                    // 1. Crear Cliente
+                    const clientRef = await addDoc(collection(db, "clients"), {
+                        name: cName,
+                        address: document.getElementById('nc_d').value.trim(),
+                        phone: document.getElementById('nc_t').value.trim(),
+                        lat, lng,
+                        date: Date.now(),
+                        mapeadoPor: currentUser ? currentUser.name : 'Desconocido'
+                    });
+
+                    // 2. Crear Venta
+                    await addDoc(collection(db, "sales"), {
+                        clientId: clientRef.id,
+                        clientName: cName,
+                        productId: pId,
+                        productName: p.name,
+                        priceType: document.getElementById('nc_price_type').value,
+                        price: pr,
+                        qty: qty,
+                        total: pr * qty,
+                        status: type,
+                        date: Date.now(),
+                        lat, lng,
+                        seller: currentUser ? currentUser.name : 'Desconocido'
+                    });
+
+                    // 3. Actualizar Stock
+                    await updateDoc(doc(db, "products", pId), { stock: Number((p.stock || 0) - qty) });
+
+                    closeModal();
+                    showToast("Cliente y Venta registrados con éxito");
+                } catch(e) { alert("Error: " + e.message); }
+            });
+            setTimeout(window.calculateNewClientSaleTotal, 100);
+        };
+
+        window.calculateNewClientSaleTotal = () => {
+            const pId = document.getElementById('nc_product')?.value;
+            const pt = document.getElementById('nc_price_type')?.value;
+            const qty = parseInt(document.getElementById('nc_qty')?.value) || 0;
+            const p = window.products.find(p => p.id === pId);
+            if(!p) return;
+            
+            let sp = p.priceUnit || 0;
+            if (pt === 'half_docen') sp = p.priceHalfDocen || (p.priceUnit * 6);
+            else if (pt === 'docen') sp = p.priceDocen || (p.priceUnit * 12);
+            else if (pt === 'box') sp = p.priceBox || (p.priceUnit * 24);
+            else if (pt === 'half_java') sp = p.priceHalfJava || (p.priceUnit * 6);
+            else if (pt === 'java') sp = p.priceJava || (p.priceUnit * 12);
+            
+            const priceField = document.getElementById('nc_price_manual');
+            if (priceField && !priceField.value) priceField.value = sp;
+            const total = safeNum(priceField?.value || sp) * qty;
+            const preview = document.getElementById('nc_price_preview');
+            if(preview) preview.innerText = total.toFixed(2) + " Bs";
+        };
+
+        window.calculateSaleTotal = () => {
+            const pId = document.getElementById('s_product')?.value;
+            const pt = document.getElementById('s_price_type')?.value;
+            const qty = parseInt(document.getElementById('s_qty')?.value) || 0;
+            const p = window.products.find(p => p.id === pId);
+            if(!p) return;
+            
+            let sp = p.priceUnit || 0;
+            if (pt === 'half_docen') sp = p.priceHalfDocen || (p.priceUnit * 6);
+            else if (pt === 'docen') sp = p.priceDocen || (p.priceUnit * 12);
+            else if (pt === 'box') sp = p.priceBox || (p.priceUnit * 24);
+            else if (pt === 'half_java') sp = p.priceHalfJava || (p.priceUnit * 6);
+            else if (pt === 'java') sp = p.priceJava || (p.priceUnit * 12);
+            
+            const priceField = document.getElementById('s_price_manual');
+            if (priceField && !priceField.value) priceField.value = sp;
+            const total = safeNum(priceField?.value || sp) * qty;
+            const preview = document.getElementById('price_preview');
+            if(preview) preview.innerText = total.toFixed(2) + " Bs";
+        };
+
+        window.toggleRouteTracking = () => {
+            const btn = document.getElementById('btnStartRoute');
+            const status = document.getElementById('routeStatus');
+            if(!isTracking) {
+                isTracking = true; 
+                if(btn) { btn.innerHTML = '<i class="fas fa-stop"></i> DETENER'; btn.className = 'btn btn-danger'; }
+                if(status) { status.style.display = 'block'; status.innerHTML = '<i class="fas fa-motorcycle fa-spin"></i> RUTA EN VIVO'; }
+                watchId = navigator.geolocation.watchPosition(pos => {
+                    const latlng = [pos.coords.latitude, pos.coords.longitude];
+                    if(userMarker) userMarker.setLatLng(latlng); 
+                    if(routePath) routePath.addLatLng(latlng); 
+                    if(map) map.panTo(latlng);
+                }, null, { enableHighAccuracy: true, timeout: 15000 });
+            } else { 
+                isTracking = false; 
+                if(watchId) navigator.geolocation.clearWatch(watchId); 
+                if(btn) { btn.innerHTML = '<i class="fas fa-play"></i> INICIAR'; btn.className = 'btn btn-success'; }
+                if(status) status.style.display = 'none'; 
+            }
+        };
+
+        window.exportPDF = async (type) => {
+            if(!currentUser || currentUser.role !== 'admin') { alert("No tienes permisos para exportar"); return; }
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('l', 'mm', 'a4');
+            doc.setFillColor(255, 152, 0); doc.rect(0, 0, 297, 25, 'F');
+            doc.setTextColor(255); doc.setFontSize(16); doc.text('LUAN S.A. - REPORTE', 15, 17);
+            const cols = type === 'inventory' ? ['Código', 'Producto', 'Stock'] : ['Cliente', 'Producto', 'Cant.', 'Total', 'Fecha'];
+            const rows = type === 'inventory' ? (window.products || []).map(p => [p.code || '', p.name || '', p.stock || 0]) : (window.sales || []).map(s => [s.clientName || '', s.productName || '', s.qty || 0, (s.total || 0).toFixed(2), new Date(s.date).toLocaleDateString()]);
+            doc.autoTable({ head: [cols], body: rows, startY: 35, theme: 'grid', headStyles: { fillColor: [255, 152, 0] } });
+            doc.save(`LUAN_${type}.pdf`);
+        };
+
+        window.openClientModal = () => {
+            const body = `<div class="form-field"><label>Nombre del Cliente</label><input id="c_n"></div><div class="form-field"><label>Propietario</label><input id="c_p"></div><div class="form-field"><label>CI / NIT</label><input id="c_ci"></div><div class="form-field"><label>Teléfono</label><input id="c_t"></div><div class="form-field"><label>Dirección</label><input id="c_d"></div>`;
+            showModal("Nuevo Cliente", body, async () => {
+                const name = document.getElementById('c_n').value.trim();
+                if(!name) { alert("Nombre requerido"); return; }
+                try {
+                    await addDoc(collection(db, "clients"), { 
+                        name, 
+                        propietario: document.getElementById('c_p').value.trim(),
+                        ci: document.getElementById('c_ci').value.trim(),
+                        phone: document.getElementById('c_t').value.trim(),
+                        address: document.getElementById('c_d').value.trim(),
+                        date: Date.now() 
+                    });
+                    closeModal(); showToast("Cliente agregado");
+                } catch(e) { alert("Error: " + e.message); }
+            });
+        };
+
+        window.openVendedorModal = () => {
+            const body = `<div class="form-field"><label>Nombre Completo</label><input id="v_n"></div><div class="form-field"><label>Usuario</label><input id="v_u"></div><div class="form-field"><label>Contraseña</label><input type="password" id="v_p"></div>`;
+            showModal("Agregar Vendedor", body, async () => {
+                const name = document.getElementById('v_n').value.trim();
+                const user = document.getElementById('v_u').value.trim();
+                const pass = document.getElementById('v_p').value.trim();
+                if(!name || !user || !pass) { alert("Todos los campos son obligatorios"); return; }
+                try {
+                    await addDoc(collection(db, "vendedores"), { name, user, pass, date: Date.now() });
+                    closeModal(); showToast("Vendedor agregado con éxito");
+                } catch(e) { alert("Error: " + e.message); }
+            });
+        };
+    </script>
+</body>
+</html>
